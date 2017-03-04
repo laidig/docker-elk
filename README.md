@@ -2,20 +2,21 @@
 
 [![Join the chat at https://gitter.im/deviantony/docker-elk](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/deviantony/docker-elk?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Run the latest version of the ELK (Elasticseach, Logstash, Kibana) stack with Docker and Docker-compose.
+Run the latest version of the ELK (Elasticsearch, Logstash, Kibana) stack with Docker and Docker-compose.
 
-It will give you the ability to analyze any data set by using the searching/aggregation capabilities of Elasticseach and the visualization power of Kibana.
+It will give you the ability to analyze any data set by using the searching/aggregation capabilities of Elasticsearch and the visualization power of Kibana.
 
 Based on the official images:
 
-* [elasticsearch](https://registry.hub.docker.com/_/elasticsearch/)
-* [logstash](https://registry.hub.docker.com/_/logstash/)
-* [kibana](https://registry.hub.docker.com/_/kibana/)
+* [elasticsearch](https://github.com/elastic/elasticsearch-docker)
+* [logstash](https://github.com/elastic/logstash-docker)
+* [kibana](https://github.com/elastic/kibana-docker)
 
 **Note**: Other branches in this project are available:
 
 * ELK 5 with X-Pack support: https://github.com/deviantony/docker-elk/tree/x-pack
 * ELK 5 in Vagrant: https://github.com/deviantony/docker-elk/tree/vagrant
+* ELK 5 with Search Guard: https://github.com/deviantony/docker-elk/tree/searchguard
 
 # Requirements
 
@@ -25,13 +26,12 @@ Based on the official images:
 2. Install [Docker-compose](http://docs.docker.com/compose/install/) **version >= 1.6**.
 3. Clone this repository
 
-## Increase max_map_count on your host (Linux)
+## Increase max_map_count on your host
 
-You need to increase `max_map_count` on your Docker host:
+You need to increase `max_map_count` on your Docker host.
+To do this follow the recommended instructions within the elastic documentation:
 
-```bash
-$ sudo sysctl -w vm.max_map_count=262144
-```
+https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
 
 ## SELinux
 
@@ -89,10 +89,26 @@ The Kibana default configuration is stored in `kibana/config/kibana.yml`.
 
 ## How can I tune Logstash configuration?
 
-The logstash configuration is stored in `logstash/config/logstash.conf`.
+The logstash configuration is stored in `logstash/config/logstash.yml`.
 
-The folder `logstash/config` is mapped onto the container `/etc/logstash/conf.d` so you
-can create more than one file in that folder if you'd like to. However, you must be aware that config files will be read from the directory in alphabetical order.
+It is also possible to map the entire `config` directory inside the container in the `docker-compose.yml`. Update the logstash container declaration to:
+
+```yml
+logstash:
+  build: logstash/
+  volumes:
+    - ./logstash/pipeline:/usr/share/logstash/pipeline
+    - ./logstash/config:/usr/share/logstash/config
+  ports:
+    - "5000:5000"
+  networks:
+    - docker_elk
+  depends_on:
+    - elasticsearch
+```
+
+In the above example the folder `logstash/config` is mapped onto the container `/usr/share/logstash/config` so you
+can create more than one file in that folder if you'd like to. However, you must be aware that config files will be read from the directory in alphabetical order, and that Logstash will be expecting a [`log4j2.properties`](https://github.com/elastic/logstash-docker/tree/master/build/logstash/config) file for its own logging.
 
 ## How can I specify the amount of memory used by Logstash?
 
@@ -103,9 +119,8 @@ If you want to override the default configuration, add the *LS_HEAP_SIZE* enviro
 ```yml
 logstash:
   build: logstash/
-  command: -f /etc/logstash/conf.d/
   volumes:
-    - ./logstash/config:/etc/logstash/conf.d
+    - ./logstash/pipeline:/usr/share/logstash/pipeline
   ports:
     - "5000:5000"
   networks:
@@ -121,7 +136,7 @@ logstash:
 To add plugins to logstash you have to:
 
 1. Add a RUN statement to the `logstash/Dockerfile` (ex. `RUN logstash-plugin install logstash-filter-json`)
-2. Add the associated plugin code configuration to the `logstash/config/logstash.conf` file
+2. Add the associated plugin code configuration to the `logstash/pipeline/logstash.conf` file
 
 ## How can I enable a remote JMX connection to Logstash?
 
@@ -132,9 +147,8 @@ Update the container in the `docker-compose.yml` to add the *LS_JAVA_OPTS* envir
 ```yml
 logstash:
   build: logstash/
-  command: -f /etc/logstash/conf.d/
   volumes:
-    - ./logstash/config:/etc/logstash/conf.d
+    - ./logstash/pipeline:/usr/share/logstash/pipeline
   ports:
     - "5000:5000"
   networks:
@@ -147,7 +161,7 @@ logstash:
 
 ## How can I tune Elasticsearch configuration?
 
-The Elasticsearch container is using the shipped configuration and it is not exposed by default.
+The Elasticsearch container is using the [shipped configuration](https://github.com/elastic/elasticsearch-docker/blob/master/build/elasticsearch/elasticsearch.yml).
 
 If you want to override the default configuration, create a file `elasticsearch/config/elasticsearch.yml` and add your configuration in it.
 
@@ -167,17 +181,18 @@ elasticsearch:
     - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
 ```
 
-You can also specify the options you want to override directly in the command field:
+You can also specify the options you want to override directly via environment variables:
 
 ```yml
 elasticsearch:
   build: elasticsearch/
-  command: elasticsearch -Des.network.host=_non_loopback_ -Des.cluster.name: my-cluster
   ports:
     - "9200:9200"
     - "9300:9300"
   environment:
     ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    network.host: "_non_loopback_"
+    cluster.name: "my-cluster"
   networks:
     - docker_elk
 ```
@@ -193,12 +208,13 @@ In order to persist Elasticsearch data even after removing the Elasticsearch con
 ```yml
 elasticsearch:
   build: elasticsearch/
-  command: elasticsearch -Des.network.host=_non_loopback_ -Des.cluster.name: my-cluster
   ports:
     - "9200:9200"
     - "9300:9300"
   environment:
     ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    network.host: "_non_loopback_"
+    cluster.name: "my-cluster"
   networks:
     - docker_elk
   volumes:
