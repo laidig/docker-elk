@@ -12,7 +12,9 @@ Based on the official images:
 * [logstash](https://github.com/elastic/logstash-docker)
 * [kibana](https://github.com/elastic/kibana-docker)
 
-**Note**: Other branches in this project are available:
+**Note**: Other bra
+
+ hes in this project are available:
 
 * ELK 5 with X-Pack support: https://github.com/deviantony/docker-elk/tree/x-pack
 * ELK 5 in Vagrant: https://github.com/deviantony/docker-elk/tree/vagrant
@@ -61,6 +63,10 @@ Now that the stack is running, you'll want to inject logs in it. The shipped log
 
 ```bash
 $ nc localhost 5000 < /path/to/logfile.log
+```
+To stream compressed logs in via ssh:
+```bash
+ssh user@server "find /home/user/logs -name \"*.xz\" | xargs cat" | unxz -c - | nc localhost 5000
 ```
 
 And then access Kibana UI by hitting [http://localhost:5601](http://localhost:5601) with a web browser.
