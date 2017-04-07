@@ -66,7 +66,7 @@ $ nc localhost 5000 < /path/to/logfile.log
 ```
 To stream compressed logs in via ssh:
 ```bash
-ssh user@server "find /home/user/logs -name \"*.xz\" | xargs cat" | unxz -c - | nc localhost 5000
+ssh user@server "find /home/user/logs/ -name \"*.xz\" | xargs cat" | unxz -c - | nc localhost 5000
 ```
 
 And then access Kibana UI by hitting [http://localhost:5601](http://localhost:5601) with a web browser.
