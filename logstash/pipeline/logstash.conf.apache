@@ -1,0 +1,30 @@
+input {
+	tcp {
+		port => 5000
+		add_field => {"tags" => "apache"}
+	}
+}
+
+## Add your filters / logstash plugins configuration here
+
+filter {
+ if "apache" in [tags]
+  grok {
+    match => { "message" => "%{COMMONAPACHELOG}" }
+    remove_field => ["message"]
+  }
+  date {
+    match => [ "timestamp" , "dd/MMM/yyyy:HH:mm:ss Z" ]
+  }
+    kv {
+            field_split => "&?"
+            source => "request"
+    }
+ }
+}
+
+output {
+	elasticsearch {
+		hosts => "elasticsearch:9200"
+	}
+}
