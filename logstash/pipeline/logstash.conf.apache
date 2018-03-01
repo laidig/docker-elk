@@ -8,7 +8,7 @@ input {
 ## Add your filters / logstash plugins configuration here
 
 filter {
- if "apache" in [tags]
+ if "apache" in [tags]{
   grok {
     match => { "message" => "%{COMMONAPACHELOG}" }
     remove_field => ["message"]
